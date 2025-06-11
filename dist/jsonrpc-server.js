@@ -45,104 +45,104 @@ const pool = new pg_1.Pool({
     port: 5432,
     user: "postgres",
     password: "1234",
-    database: "ExamenWeb"
+    database: "ExamenWebII"
 });
 // Definir los métodos JSON-RPC
 const methods = {
-    addUser: function (args, callback) {
-        if (!args.name || !args.email) {
-            callback({ code: -32602, message: "Faltan datos obligatorios (name, email)" });
+    addLibro: function (args, callback) {
+        if (!args.titulo || !args.autor || !args.estado) {
+            callback({ code: -32602, message: "Faltan datos obligatorios (titulo, autor, estado)" });
             return;
         }
-        pool.query("INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *", [args.name, args.email])
+        pool.query("INSERT INTO libros (titulo, autor, estado) VALUES ($1, $2, $3) RETURNING *", [args.titulo, args.autor, args.estado])
             .then(result => callback(null, result.rows[0]))
-            .catch(err => callback({ code: -32000, message: "Error al insertar usuario", data: err }));
+            .catch(err => callback({ code: -32000, message: "Error al insertar libro", data: err }));
     },
-    sum: function (args, callback) {
-        callback(null, args.a + args.b);
-    },
-    hello: function (args, callback) {
-        callback(null, `Hola, ${args.name}!`);
-    },
-    updateUser: function (args, callback) {
-        if (!args.id || !args.name || !args.email) {
-            callback({ code: -32602, message: "Faltan datos obligatorios (id, name, email)" });
+    updateLibro: function (args, callback) {
+        // Validar explícitamente null o undefined
+        if (args.id === undefined || args.id === null || !args.titulo || !args.autor || !args.estado) {
+            callback({ code: -32602, message: "Faltan datos obligatorios (id, titulo, autor, estado)" });
             return;
         }
-        pool.query("UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING *", [args.name, args.email, args.id])
+        pool.query("UPDATE libros SET titulo = $1, autor = $2, estado = $3 WHERE id = $4 RETURNING *", [args.titulo, args.autor, args.estado, args.id])
             .then(result => {
             if (result.rowCount === 0) {
-                callback({ code: -32001, message: "Usuario no encontrado" });
+                callback({ code: -32001, message: "Libro no encontrado" });
             }
             else {
                 callback(null, result.rows[0]);
             }
         })
-            .catch(err => callback({ code: -32000, message: "Error al actualizar usuario", data: err }));
+            .catch(err => callback({ code: -32000, message: "Error al actualizar libro", data: err }));
     },
-    deleteUser: function (args, callback) {
+    deleteLibro: function (args, callback) {
         if (!args.id) {
-            callback({ code: -32602, message: "Falta el id del usuario a eliminar" });
+            callback({ code: -32602, message: "Falta el id del libro a eliminar" });
             return;
         }
-        pool.query("DELETE FROM users WHERE id = $1 RETURNING *", [args.id])
+        pool.query("DELETE FROM libros WHERE id = $1 RETURNING *", [args.id])
             .then(result => {
             if (result.rowCount === 0) {
-                callback({ code: -32001, message: "Usuario no encontrado" });
+                callback({ code: -32001, message: "Libro no encontrado" });
             }
             else {
-                callback(null, { message: "Usuario eliminado", user: result.rows[0] });
+                callback(null, { message: "Libro eliminado", libro: result.rows[0] });
             }
         })
-            .catch(err => callback({ code: -32000, message: "Error al eliminar usuario", data: err }));
-    }
+            .catch(err => callback({ code: -32000, message: "Error al eliminar libro", data: err }));
+    },
+    listarLibros: function (_, callback) {
+        pool.query("SELECT * FROM libros")
+            .then(result => callback(null, result.rows))
+            .catch(err => callback({ code: -32000, message: "Error al obtener libros", data: err }));
+    },
 };
 const server = new jayson.Server(methods);
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
-// GET: obtener usuarios
+// GET: obtener libros
 app.get("/jsonrpc", (req, res) => {
     (async () => {
         try {
-            const result = await pool.query("SELECT * FROM users");
+            const result = await pool.query("SELECT * FROM libros");
             res.json(result.rows);
         }
         catch (err) {
-            res.status(500).json({ error: "Error al obtener usuarios", details: err });
+            res.status(500).json({ error: "Error al obtener libros", details: err });
         }
     })();
 });
-// PUT: actualizar usuario (requiere id y datos en body)
+// PUT: actualizar libro
 app.put("/jsonrpc", (req, res) => {
     (async () => {
-        const { id, name, email } = req.body;
-        if (!id || !name || !email) {
-            res.status(400).json({ error: "Faltan datos obligatorios (id, name, email)" });
+        const { id, titulo, autor, estado } = req.body;
+        if (!id || !titulo || !autor || !estado) {
+            res.status(400).json({ error: "Faltan datos obligatorios (id, titulo, autor, estado)" });
             return;
         }
         try {
-            await pool.query("UPDATE users SET name = $1, email = $2 WHERE id = $3", [name, email, id]);
-            res.json({ message: "Usuario actualizado" });
+            await pool.query("UPDATE libros SET titulo = $1, autor = $2, estado = $3 WHERE id = $4", [titulo, autor, estado, id]);
+            res.json({ message: "Libro actualizado" });
         }
         catch (err) {
-            res.status(500).json({ error: "Error al actualizar usuario", details: err });
+            res.status(500).json({ error: "Error al actualizar libro", details: err });
         }
     })();
 });
-// DELETE: eliminar usuario (requiere id en body)
+// DELETE: eliminar libro
 app.delete("/jsonrpc", (req, res) => {
     (async () => {
         const { id } = req.body;
         if (!id) {
-            res.status(400).json({ error: "Falta el id del usuario a eliminar" });
+            res.status(400).json({ error: "Falta el id del libro a eliminar" });
             return;
         }
         try {
-            await pool.query("DELETE FROM users WHERE id = $1", [id]);
-            res.json({ message: "Usuario eliminado" });
+            await pool.query("DELETE FROM libros WHERE id = $1", [id]);
+            res.json({ message: "Libro eliminado" });
         }
         catch (err) {
-            res.status(500).json({ error: "Error al eliminar usuario", details: err });
+            res.status(500).json({ error: "Error al eliminar libro", details: err });
         }
     })();
 });
